@@ -9,3 +9,6 @@ members = [
     "examples",
 ]
 resolver = "2"
+
+[patch.crates-io]
+quinn = { git = "https://github.com/RelyVPN/quinn" }

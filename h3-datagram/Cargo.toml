@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 #h3 = { path = "../h3" }
-bytes = "1.4"
+bytes = "1.10"
 pin-project-lite = { version = "0.2", default-features = false }
 
 [dependencies.h3]

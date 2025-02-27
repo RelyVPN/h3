@@ -4,7 +4,7 @@
 #![deny(missing_docs)]
 
 use std::{
-    convert::TryInto,
+    convert::TryFrom,
     fmt::{self, Display},
     future::Future,
     pin::Pin,
@@ -499,13 +499,21 @@ impl quic::RecvStream for RecvStream {
 
     #[cfg_attr(feature = "tracing", instrument(skip_all, level = "trace"))]
     fn recv_id(&self) -> StreamId {
-        self.stream
+        let id = self.stream
             .as_ref()
             .unwrap()
-            .id()
-            .0
-            .try_into()
-            .expect("invalid stream id")
+            .id();
+        
+        // 将 quinn 的 StreamId 转换为 u64，然后转换为 h3 的 StreamId
+        let index = id.index();
+        let initiator = id.initiator();
+        let dir = id.dir();
+        
+        // 构建与 quinn StreamId 相同格式的 u64
+        let value = index << 2 | (if dir == quinn::Dir::Uni { 1 } else { 0 }) << 1 | (if initiator == quinn::Side::Client { 0 } else { 1 });
+        
+        // 使用 TryFrom 转换为 h3 的 StreamId
+        StreamId::try_from(value).expect("invalid stream id")
     }
 }
 
@@ -628,7 +636,18 @@ where
 
     #[cfg_attr(feature = "tracing", instrument(skip_all, level = "trace"))]
     fn send_id(&self) -> StreamId {
-        self.stream.id().0.try_into().expect("invalid stream id")
+        let id = self.stream.id();
+        
+        // 将 quinn 的 StreamId 转换为 u64，然后转换为 h3 的 StreamId
+        let index = id.index();
+        let initiator = id.initiator();
+        let dir = id.dir();
+        
+        // 构建与 quinn StreamId 相同格式的 u64
+        let value = index << 2 | (if dir == quinn::Dir::Uni { 1 } else { 0 }) << 1 | (if initiator == quinn::Side::Client { 0 } else { 1 });
+        
+        // 使用 TryFrom 转换为 h3 的 StreamId
+        StreamId::try_from(value).expect("invalid stream id")
     }
 }
 
