@@ -321,7 +321,7 @@ where
                 Err(StreamErrorIncoming::ConnectionErrorIncoming { connection_error }) => {
                     return Poll::Ready(Err(PollTypeError::IncomingError(connection_error)));
                 }
-                Err(StreamErrorIncoming::StreamTerminated { error_code }) => {
+                Err(StreamErrorIncoming::StreamTerminated { error_code: _ }) => {
                     Some(StreamEnd::Reset(()))
                 }
                 Err(StreamErrorIncoming::Unknown(_err)) => {
