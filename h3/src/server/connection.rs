@@ -237,12 +237,18 @@ where
             Frame::Settings(_setting) => {
                 #[cfg(feature = "tracing")]
                 trace!("Got settings > {:?}", _setting);
-                ()
             }
             &Frame::Goaway(id) => self.inner.process_goaway(&mut self.recv_closing, id)?,
             _frame @ Frame::MaxPushId(_) | _frame @ Frame::CancelPush(_) => {
                 #[cfg(feature = "tracing")]
                 warn!("Control frame ignored {:?}", _frame);
+
+                //= https://www.rfc-editor.org/rfc/rfc9114#section-7.2.3
+                //= type=TODO
+                //# If a CANCEL_PUSH frame is received that
+                //# references a push ID greater than currently allowed on the
+                //# connection, this MUST be treated as a connection error of type
+                //# H3_ID_ERROR.
 
                 //= https://www.rfc-editor.org/rfc/rfc9114#section-7.2.3
                 //= type=TODO

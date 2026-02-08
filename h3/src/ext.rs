@@ -13,6 +13,10 @@ impl Protocol {
     pub const WEB_TRANSPORT: Protocol = Protocol(ProtocolInner::WebTransport);
     /// RFC 9298 protocol
     pub const CONNECT_UDP: Protocol = Protocol(ProtocolInner::ConnectUdp);
+    /// RFC 9484 protocol
+    pub const CONNECT_IP: Protocol = Protocol(ProtocolInner::ConnectIp);
+    /// RFC 9220 (WebSocket) protocol
+    pub const WEBSOCKET: Protocol = Protocol(ProtocolInner::WebSocket);
 
     /// Return a &str representation of the `:protocol` pseudo-header value
     #[inline]
@@ -20,6 +24,8 @@ impl Protocol {
         match self.0 {
             ProtocolInner::WebTransport => "webtransport",
             ProtocolInner::ConnectUdp => "connect-udp",
+            ProtocolInner::ConnectIp => "connect-ip",
+            ProtocolInner::WebSocket => "websocket",
         }
     }
 }
@@ -28,6 +34,8 @@ impl Protocol {
 enum ProtocolInner {
     WebTransport,
     ConnectUdp,
+    ConnectIp,
+    WebSocket,
 }
 
 /// Error when parsing the protocol
@@ -40,6 +48,8 @@ impl FromStr for Protocol {
         match s {
             "webtransport" => Ok(Self(ProtocolInner::WebTransport)),
             "connect-udp" => Ok(Self(ProtocolInner::ConnectUdp)),
+            "connect-ip" => Ok(Self(ProtocolInner::ConnectIp)),
+            "websocket" => Ok(Self(ProtocolInner::WebSocket)),
             _ => Err(InvalidProtocol),
         }
     }

@@ -8,13 +8,12 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{self, Poll},
+    task::{self, ready, Poll},
 };
 
 use bytes::{Buf, Bytes};
 
-use futures::{
-    ready,
+use futures_util::{
     stream::{self},
     Stream, StreamExt,
 };
@@ -79,7 +78,7 @@ where
     ) -> Poll<Result<Self::BidiStream, ConnectionErrorIncoming>> {
         let (send, recv) = ready!(self.incoming_bi.poll_next_unpin(cx))
             .expect("self.incoming_bi BoxStream never returns None")
-            .map_err(|e| convert_connection_error(e))?;
+            .map_err(convert_connection_error)?;
         Poll::Ready(Ok(Self::BidiStream {
             send: Self::SendStream::new(send),
             recv: Self::RecvStream::new(recv),
@@ -93,7 +92,7 @@ where
     ) -> Poll<Result<Self::RecvStream, ConnectionErrorIncoming>> {
         let recv = ready!(self.incoming_uni.poll_next_unpin(cx))
             .expect("self.incoming_uni BoxStream never returns None")
-            .map_err(|e| convert_connection_error(e))?;
+            .map_err(convert_connection_error)?;
         Poll::Ready(Ok(Self::RecvStream::new(recv)))
     }
 
@@ -339,12 +338,23 @@ where
     }
 }
 
+impl<B> quic::Is0rtt for BidiStream<B>
+where
+    B: Buf,
+{
+    fn is_0rtt(&self) -> bool {
+        self.recv.is_0rtt()
+    }
+}
+
 /// Quinn-backed receive stream
 ///
 /// Implements a [`quic::RecvStream`] backed by a [`quinn::RecvStream`].
 pub struct RecvStream {
     stream: Option<quinn::RecvStream>,
     read_chunk_fut: ReadChunkFuture,
+    is_0rtt: bool,
+    pending_stop: Option<VarInt>,
 }
 
 type ReadChunkFuture = ReusableBoxFuture<
@@ -357,10 +367,13 @@ type ReadChunkFuture = ReusableBoxFuture<
 
 impl RecvStream {
     fn new(stream: quinn::RecvStream) -> Self {
+        let is_0rtt = stream.is_0rtt();
         Self {
             stream: Some(stream),
             // Should only allocate once the first time it's used
             read_chunk_fut: ReusableBoxFuture::new(async { unreachable!() }),
+            is_0rtt,
+            pending_stop: None,
         }
     }
 }
@@ -380,20 +393,24 @@ impl quic::RecvStream for RecvStream {
             })
         };
 
-        let (stream, chunk) = ready!(self.read_chunk_fut.poll(cx));
+        let (mut stream, chunk) = ready!(self.read_chunk_fut.poll(cx));
+        if let Some(error_code) = self.pending_stop.take() {
+            let _ = stream.stop(error_code);
+        }
         self.stream = Some(stream);
         Poll::Ready(Ok(chunk
-            .map_err(|e| convert_read_error_to_stream_error(e))?
+            .map_err(convert_read_error_to_stream_error)?
             .map(|c| c.bytes)))
     }
 
     #[cfg_attr(feature = "tracing", instrument(skip_all, level = "trace"))]
     fn stop_sending(&mut self, error_code: u64) {
-        self.stream
-            .as_mut()
-            .unwrap()
-            .stop(VarInt::from_u64(error_code).expect("invalid error_code"))
-            .ok();
+        let error_code = VarInt::from_u64(error_code).expect("invalid error_code");
+        if let Some(stream) = self.stream.as_mut() {
+            let _ = stream.stop(error_code);
+        } else {
+            self.pending_stop = Some(error_code);
+        }
     }
 
     #[cfg_attr(feature = "tracing", instrument(skip_all, level = "trace"))]
@@ -401,6 +418,16 @@ impl quic::RecvStream for RecvStream {
         let num: u64 = self.stream.as_ref().unwrap().id().into();
 
         num.try_into().expect("invalid stream id")
+    }
+}
+
+impl quic::Is0rtt for RecvStream {
+    /// Check if this stream has been opened during 0-RTT.
+    ///
+    /// In which case any non-idempotent request should be considered dangerous at the application
+    /// level. Because read data is subject to replay attacks.
+    fn is_0rtt(&self) -> bool {
+        self.is_0rtt
     }
 }
 
@@ -450,7 +477,7 @@ where
 {
     fn new(stream: quinn::SendStream) -> SendStream<B> {
         Self {
-            stream: stream,
+            stream,
             writing: None,
         }
     }
@@ -466,7 +493,7 @@ where
             while data.has_remaining() {
                 let stream = Pin::new(&mut self.stream);
                 let written = ready!(stream.poll_write(cx, data.chunk()))
-                    .map_err(|err| convert_write_error_to_stream_error(err))?;
+                    .map_err(convert_write_error_to_stream_error)?;
                 data.advance(written);
             }
         }
