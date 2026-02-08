@@ -322,7 +322,7 @@ where
                     return Poll::Ready(Err(PollTypeError::IncomingError(connection_error)));
                 }
                 Err(StreamErrorIncoming::StreamTerminated { error_code: _ }) => {
-                    Some(StreamEnd::Reset(()))
+                    Some(StreamEnd::Reset(0))
                 }
                 Err(StreamErrorIncoming::Unknown(_err)) => {
                     #[cfg(feature = "tracing")]

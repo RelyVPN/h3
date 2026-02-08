@@ -850,7 +850,7 @@ where
     pub fn poll_recv_data(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<Option<impl Buf>, StreamError>> {
+    ) -> Poll<Result<Option<impl Buf + use<S, B>>, StreamError>> {
         if !self.stream.has_data() {
             match ready!(self.stream.poll_next(cx)) {
                 Err(frame_stream_error) => {

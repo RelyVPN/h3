@@ -11,4 +11,5 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-quinn = { git = "https://github.com/RelyVPN/quinn" }
+quinn = { git = "https://github.com/RelyVPN/quinn", branch = "main" }
+quinn-proto = { git = "https://github.com/RelyVPN/quinn", branch = "main" }

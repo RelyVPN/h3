@@ -126,7 +126,7 @@ impl Pair {
             QuicClientConfig::try_from(crypto).unwrap(),
         ));
 
-        let mut client_endpoint =
+        let client_endpoint =
             h3_quinn::quinn::Endpoint::client("[::]:0".parse().unwrap()).unwrap();
         client_endpoint.set_default_client_config(client_config);
         client_endpoint
@@ -146,7 +146,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub async fn next(&mut self) -> impl quic::Connection<Bytes> {
+    pub async fn next(&mut self) -> impl quic::Connection<Bytes> + use<> {
         Connection::new(self.endpoint.accept().await.unwrap().await.unwrap())
     }
 }

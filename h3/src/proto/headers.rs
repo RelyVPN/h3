@@ -192,7 +192,7 @@ impl Iterator for HeaderIter {
             if let Some(new) = new_header_name {
                 self.last_header_name = Some(new);
             }
-            if let (Some(ref n), v) = (&self.last_header_name, header_value) {
+            if let (Some(n), v) = (&self.last_header_name, header_value) {
                 return Some((n.as_str(), v.as_bytes()).into());
             }
         }
